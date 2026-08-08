@@ -328,63 +328,6 @@ def build_reconsideration_prompt(
     )
 
 
-def build_hitl_interpretation_prompt(
-    failure_context: dict[str, Any],
-    user_nl_instruction: str,
-    tools_description_for_llm: str,
-) -> str:
-    return dedent(
-        f"""
-        The BDI agent encountered a failure during plan execution.
-        The user has provided natural language guidance on how to proceed.
-        Your task is to interpret this guidance and translate it into a structured PlanManipulationDirective.
-
-        Current Failure Context:
-        - Desire ID: {failure_context["desire_id"]}
-        - Intention: {failure_context.get("intention_description") or "(no description)"}
-        - Plan Status: {failure_context.get("plan_status", "unknown")}
-        - Failed Plan Step ({failure_context["failed_step_number"]}/{failure_context["total_steps_in_plan"]}): "{failure_context["failed_step_description"]}"
-        - Original Failed Plan Step Object: {json.dumps(failure_context["original_failed_step_object"])}
-        - Is Tool Call: {failure_context["is_tool_call"]}
-        - Tool Name: {failure_context["tool_name"] if failure_context["is_tool_call"] else "N/A"}
-        - Tool Params Used: {json.dumps(failure_context["tool_params"]) if failure_context["is_tool_call"] and failure_context["tool_params"] else "N/A"}
-        - Plan Step Result Data: {json.dumps(failure_context["step_result_output"])}
-        - Current Beliefs: {json.dumps(failure_context["current_beliefs"])}
-        - Remaining Plan Steps (after failed one): {json.dumps(failure_context["remaining_plan_steps"])}
-
-        User's Natural Language Guidance:
-        "{user_nl_instruction}"
-
-        {tools_description_for_llm}
-
-        Instructions for you, the LLM:
-        1. Analyze the user's guidance in the context of the failure.
-        2. Determine the most appropriate 'manipulation_type' from the available literals in PlanManipulationDirective.
-
-        CRITICAL: Extract Factual Information to Beliefs
-        3. **ALWAYS populate 'beliefs_to_update' when the user provides factual information**, REGARDLESS of manipulation_type.
-           This is INDEPENDENT of plan modification. You can extract beliefs AND modify the plan in the same directive.
-           Examples of factual information to extract as beliefs:
-           * File paths (e.g., "the repo is at /path/to/repo" -> belief: repo_path = "/path/to/repo")
-           * Status values (e.g., "the service is offline" -> belief: service_status = "offline")
-           * Configuration values (e.g., "use port 8080" -> belief: server_port = "8080")
-           * Constraints (e.g., "that API requires authentication" -> belief: api_requires_auth = "true")
-           * Error causes (e.g., "path doesn't exist" -> belief: path_invalid = "true")
-
-        Plan Manipulation:
-        4. If the user suggests modifying the current step, populate 'current_step_modifications' with a dictionary of changes. For tool calls, this is often a new 'tool_params' dictionary. For descriptive steps, it might be a new 'description'.
-        5. If the user suggests new steps, populate 'new_steps_definition' with a list of dictionaries. Each dictionary must conform to the PlanStep schema (fields: description, is_tool_call, tool_name, tool_params).
-           If generating tool calls, ensure 'tool_name' is valid from the available tools and 'tool_params' are appropriate.
-
-        Summary:
-        6. Provide a concise 'user_guidance_summary' explaining your interpretation, chosen action, AND any beliefs extracted.
-        7. If the user's guidance is unclear, a comment, or cannot be mapped to a specific plan manipulation, use 'COMMENT_NO_ACTION' and explain in the summary (but still extract beliefs if factual information was provided).
-
-        REMEMBER: Belief extraction and plan manipulation are ORTHOGONAL. Even when choosing MODIFY_CURRENT_AND_RETRY or RETRY_CURRENT_AS_IS, if the user provides factual information, EXTRACT IT TO BELIEFS.
-        """
-    )
-
-
 def build_belief_update_resolution_prompt(
     belief_name: str,
     existing_value: Any,
@@ -449,7 +392,6 @@ def build_belief_name_resolution_prompt(
 
 __all__ = [
     "build_descriptive_execution_prompt",
-    "build_hitl_interpretation_prompt",
     "build_initial_belief_extraction_prompt",
     "build_planning_stage1_prompt",
     "build_desire_satisfaction_prompt",

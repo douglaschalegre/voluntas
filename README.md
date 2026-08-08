@@ -3,7 +3,7 @@
 Voluntas is a BDI (Belief-Desire-Intention) agent framework built on top of
 [Pydantic AI](https://ai.pydantic.dev/). It provides structured beliefs,
 desires, intentions, adaptive planning, execution, reconsideration, usage
-tracking, and optional human-in-the-loop intervention.
+tracking.
 
 ## Installation
 
@@ -67,7 +67,6 @@ The complete schema surface is available from `voluntas.schemas`:
 from voluntas.schemas import (
     BeliefExtractionResult,
     HighLevelIntentionList,
-    PlanManipulationDirective,
     ReconsiderResult,
 )
 ```
@@ -86,21 +85,14 @@ The framework supports MCP servers through the Pydantic AI integration passed
 to `BDI`, as well as structured logs and aggregate usage tracking through
 `BDIUsageTracker`.
 
-## Human-in-the-loop
-
-Set `enable_human_in_the_loop=True` to allow failures to be presented to a
-human for guidance. The guidance is interpreted into structured actions such
-as retrying, modifying, replacing, inserting, skipping, or aborting plan
-steps.
-
 ## Development
 
 Clone the repository and install development dependencies with uv:
 
 ```bash
 uv sync --group dev
-uv run ruff check voluntas tests scripts
-uv run pytest
+uv run lint
+uv run tests
 ```
 
 ## License

@@ -6,7 +6,6 @@ A modular BDI agent implementation built on Pydantic AI, with support for:
 - Single-stage intention generation
 - Step-by-step execution with outcome analysis
 - Plan reconsideration and monitoring
-- Human-in-the-loop intervention
 
 Main exports:
 - BDI: The main agent class
@@ -34,7 +33,6 @@ from voluntas.schemas import (
     PlanningDecision,
     ReconsiderResult,
     BeliefExtractionResult,
-    PlanManipulationDirective,
 )
 
 __all__ = [
@@ -56,5 +54,4 @@ __all__ = [
     "PlanningDecision",
     "ReconsiderResult",
     "BeliefExtractionResult",
-    "PlanManipulationDirective",
 ]

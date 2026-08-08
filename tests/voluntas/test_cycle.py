@@ -9,9 +9,7 @@ from voluntas.schemas import DesireStatus, PlanStatus, PlanStep, ReconsiderResul
 def test_is_final_cycle_status_identifies_stopping_statuses() -> None:
     assert cycle.is_final_cycle_status("terminal") is True
     assert cycle.is_final_cycle_status("stopped") is True
-    assert cycle.is_final_cycle_status("interrupted") is True
     assert cycle.is_final_cycle_status("executed") is False
-    assert cycle.is_final_cycle_status("idle_prompted") is False
 
 
 @pytest.mark.asyncio
@@ -29,68 +27,11 @@ async def test_cycle_returns_terminal_when_all_desires_done(stub_agent) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cycle_stops_when_idle_and_hitl_disabled(stub_agent) -> None:
+async def test_cycle_stops_when_idle(stub_agent) -> None:
     result = await cycle.bdi_cycle(stub_agent)
 
     assert result == "stopped"
     assert stub_agent.cycle_count == 1
-
-
-@pytest.mark.asyncio
-async def test_cycle_returns_interrupted_when_idle_prompt_has_no_input(
-    monkeypatch,
-    stub_agent,
-) -> None:
-    stub_agent.enable_human_in_the_loop = True
-    monkeypatch.setattr(
-        "builtins.input",
-        lambda _prompt: (_ for _ in ()).throw(EOFError),
-    )
-
-    result = await cycle.bdi_cycle(stub_agent)
-
-    assert result == "interrupted"
-
-
-@pytest.mark.asyncio
-async def test_cycle_stops_when_idle_user_enters_exit_command(
-    monkeypatch,
-    stub_agent,
-) -> None:
-    stub_agent.enable_human_in_the_loop = True
-    monkeypatch.setattr("builtins.input", lambda _prompt: "quit")
-
-    result = await cycle.bdi_cycle(stub_agent)
-
-    assert result == "stopped"
-
-
-@pytest.mark.asyncio
-async def test_cycle_adds_prompted_desire_and_generates_intention(
-    monkeypatch,
-    stub_agent,
-) -> None:
-    stub_agent.enable_human_in_the_loop = True
-    generated = False
-
-    async def generate_for_prompted_desire(_agent):
-        nonlocal generated
-        generated = True
-
-    monkeypatch.setattr("builtins.input", lambda _prompt: "Write the report")
-    monkeypatch.setattr(
-        cycle,
-        "generate_intentions_from_desires",
-        generate_for_prompted_desire,
-    )
-
-    result = await cycle.bdi_cycle(stub_agent)
-
-    assert result == "idle_prompted"
-    assert generated is True
-    assert len(stub_agent.desires) == 1
-    assert stub_agent.desires[0].description == "Write the report"
-    assert stub_agent.desires[0].status is DesireStatus.PENDING
 
 
 @pytest.mark.asyncio
@@ -206,41 +147,6 @@ async def test_cycle_reconsiders_after_failed_plan_step(
 
     assert result == "executed"
     assert reconsidered is True
-
-
-@pytest.mark.asyncio
-async def test_cycle_skips_reconsideration_when_hitl_modified_plan(
-    monkeypatch,
-    stub_agent,
-) -> None:
-    desire = stub_agent.add_desire(
-        desire_id="desire_hitl",
-        description="Needs human guidance",
-        status=DesireStatus.ACTIVE,
-    )
-    intention = stub_agent.set_current_intention(
-        desire_id=desire.id,
-        step_descriptions=["retry after guidance"],
-    )
-
-    async def execute_with_hitl_update(_agent):
-        return ExecutionOutcome(ExecutionOutcomeKind.PLAN_MODIFIED, True)
-
-    async def fail_if_reconsideration_runs(_agent):
-        raise AssertionError("HITL-modified plans should not reconsider immediately")
-
-    monkeypatch.setattr(cycle, "execute_intentions", execute_with_hitl_update)
-    monkeypatch.setattr(
-        cycle,
-        "reconsider_current_intention",
-        fail_if_reconsideration_runs,
-    )
-
-    result = await cycle.bdi_cycle(stub_agent)
-
-    assert result == "executed"
-    assert stub_agent.active_intention is intention
-    assert desire.status is DesireStatus.ACTIVE
 
 
 @pytest.mark.asyncio

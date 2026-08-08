@@ -42,7 +42,6 @@ class ExecutionOutcomeKind(str, Enum):
     NO_INTENTION = "no_intention"
     STEP_SUCCEEDED = "step_succeeded"
     STEP_FAILED = "step_failed"
-    PLAN_MODIFIED = "plan_modified"
     PLAN_COMPLETED = "plan_completed"
     EXCEPTION = "exception"
 
@@ -50,7 +49,6 @@ class ExecutionOutcomeKind(str, Enum):
 @dataclass(frozen=True)
 class ExecutionOutcome:
     kind: ExecutionOutcomeKind
-    hitl_updated_beliefs: bool = False
 
     @property
     def should_reconsider(self) -> bool:
@@ -576,34 +574,6 @@ async def _handle_failed_step(
         f"{bcolors.WARNING}  Plan Step {plan.current_step_index + 1} failed analysis after {retry_ctx.attempt_number} attempt(s). Intention progress paused.{bcolors.ENDC}"
     )
 
-    hitl_success = False
-    hitl_updated_beliefs = False
-    if agent.enable_human_in_the_loop:
-        try:
-            from voluntas.hitl import human_in_the_loop_intervention
-
-            hitl_success, hitl_updated_beliefs = await human_in_the_loop_intervention(
-                agent,
-                intention,
-                current_step,
-                step_result,
-            )
-        except Exception as hitl_e:
-            print(
-                f"{bcolors.FAIL}Error during HITL intervention: {hitl_e}{bcolors.ENDC}"
-            )
-            if agent.verbose:
-                traceback.print_exc()
-
-    if hitl_success:
-        print(
-            f"{bcolors.SYSTEM}  HITL intervention successful. Step will be retried in next cycle.{bcolors.ENDC}"
-        )
-        return ExecutionOutcome(
-            ExecutionOutcomeKind.PLAN_MODIFIED,
-            hitl_updated_beliefs=hitl_updated_beliefs,
-        )
-
     log_states(agent, ["beliefs"])
     plan.record_failure(
         current_step,
@@ -625,9 +595,7 @@ async def execute_intentions(agent: "BDI") -> ExecutionOutcome:
         agent: The BDI agent instance
 
     Returns:
-        Dictionary with keys:
-        - 'hitl_modified_plan': bool - whether HITL modified the plan this execution
-        - 'hitl_updated_beliefs': bool - whether HITL updated beliefs
+        The outcome of executing the current plan step.
     """
     if agent.active_intention is None:
         print(f"{bcolors.SYSTEM}No intentions to execute.{bcolors.ENDC}")

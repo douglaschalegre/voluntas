@@ -1,7 +1,7 @@
 """Main BDI (Belief-Desire-Intention) agent implementation.
 
 This module contains the main BDI agent class that orchestrates all BDI components:
-beliefs, desires, intentions, planning, execution, monitoring, and human-in-the-loop.
+beliefs, desires, intentions, planning, execution, and monitoring.
 """
 
 from collections.abc import Sequence
@@ -73,7 +73,6 @@ class BDI(Agent, Generic[T]):
         desires: Optional[List[str]] = None,
         intentions: Optional[List[str]] = None,
         verbose: bool = False,
-        enable_human_in_the_loop: bool = False,
         log_file_path: Optional[str] = None,
         structured_log_file_path: Optional[str] = None,
         usage_tracker: Optional[BDIUsageTracker] = None,
@@ -90,7 +89,6 @@ class BDI(Agent, Generic[T]):
         self.initial_intention_guidance: List[str] = intentions or []
         self._initial_intention_guidance_consumed = False
         self.verbose = verbose
-        self.enable_human_in_the_loop = enable_human_in_the_loop
         self.log_file_path = log_file_path
         self.structured_log_file_path = structured_log_file_path
         self.usage_tracker = usage_tracker
@@ -410,10 +408,8 @@ class BDI(Agent, Generic[T]):
         Returns:
             Status string indicating cycle outcome:
             - "executed": Normal cycle with work done
-            - "idle_prompted": Agent was idle, user provided new desire
             - "terminal": All known desires are terminal and no intentions remain
-            - "stopped": User requested to quit
-            - "interrupted": Non-interactive mode (EOF) or KeyboardInterrupt
+            - "stopped": No pending work remains
         """
         return await bdi_cycle(self)
 

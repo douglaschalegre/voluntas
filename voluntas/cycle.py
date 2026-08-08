@@ -7,8 +7,7 @@ deliberation, intention generation, execution, and plan monitoring.
 from typing import TYPE_CHECKING
 
 from voluntas._utils import bcolors
-from voluntas.schemas import DesireStatus, Desire, generate_desire_id
-from voluntas.io_helpers import is_exit_command
+from voluntas.schemas import DesireStatus
 from voluntas.logging import log_states
 from voluntas.planning import generate_intentions_from_desires
 from voluntas.execution import ExecutionOutcome, ExecutionOutcomeKind, execute_intentions
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
     from voluntas.agent import BDI
 
 
-FINAL_CYCLE_STATUSES = frozenset({"terminal", "stopped", "interrupted"})
+FINAL_CYCLE_STATUSES = frozenset({"terminal", "stopped"})
 
 
 def is_final_cycle_status(status: str) -> bool:
@@ -37,8 +36,8 @@ async def bdi_cycle(agent: "BDI") -> str:
     4. Intention Execution (one step)
     5. Reconsideration (plan validity monitoring)
 
-    If the agent is idle (no intentions and no active desires), it will
-    interactively prompt the user for new desires via stdin.
+    If the agent is idle (no intentions and no active desires), the cycle
+    stops without requesting additional input.
 
     Args:
         agent: The BDI agent instance
@@ -46,10 +45,8 @@ async def bdi_cycle(agent: "BDI") -> str:
     Returns:
         Status string indicating cycle outcome:
         - "executed": Normal cycle with work done
-        - "idle_prompted": Agent was idle, user provided new desire
         - "terminal": All known desires are terminal and no intentions remain
-        - "stopped": User requested to quit
-        - "interrupted": Non-interactive mode (EOF) or KeyboardInterrupt
+        - "stopped": No pending work remains
     """
     agent.cycle_count += 1
 
@@ -113,48 +110,10 @@ async def bdi_cycle(agent: "BDI") -> str:
                 f"{bcolors.SYSTEM}No intentions pending and no active desires require new ones.{bcolors.ENDC}"
             )
 
-            if not agent.enable_human_in_the_loop:
-                print(
-                    f"{bcolors.SYSTEM}Agent is idle and human-in-the-loop is disabled. Stopping.{bcolors.ENDC}"
-                )
-                return "stopped"
-
-            # Agent is idle - prompt user for new desires
             print(
-                f"{bcolors.SYSTEM}Agent is idle. Enter a new desire/goal (or 'quit' to exit):{bcolors.ENDC}"
+                f"{bcolors.SYSTEM}Agent is idle with no pending work. Stopping.{bcolors.ENDC}"
             )
-            try:
-                user_input = input("> ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print(f"\n{bcolors.WARNING}Input interrupted.{bcolors.ENDC}")
-                return "interrupted"
-
-            if not user_input or is_exit_command(user_input):
-                print(f"{bcolors.SYSTEM}User requested stop.{bcolors.ENDC}")
-                return "stopped"
-
-            # Create new desire from user input
-            new_desire = Desire(
-                id=generate_desire_id(user_input),
-                description=user_input,
-                priority=0.5,
-            )
-            agent.desires.append(new_desire)
-            log_states(agent, ["desires"], message="New desire added from user prompt.")
-
-            # Generate intentions from the new desire
-            await generate_intentions_from_desires(agent)
-
-            # Log and return idle_prompted status
-            print(
-                f"{bcolors.SYSTEM}--- BDI Cycle End (idle_prompted) ---{bcolors.ENDC}"
-            )
-            log_states(
-                agent,
-                types=["beliefs", "desires", "intentions"],
-                message="States after BDI cycle (idle_prompted)",
-            )
-            return "idle_prompted"
+            return "stopped"
 
     # 4. Intention Execution (One Step)
     outcome = ExecutionOutcome(ExecutionOutcomeKind.NO_INTENTION)
@@ -165,16 +124,7 @@ async def bdi_cycle(agent: "BDI") -> str:
 
     # 5. Reconsideration (Plan Monitoring)
     # After executing a step (successfully or not), reconsider the current plan.
-    # SKIP reconsideration if HITL just modified the plan (give it a chance to execute first)
-    if outcome.kind is ExecutionOutcomeKind.PLAN_MODIFIED:
-        print(
-            f"{bcolors.SYSTEM}  Skipping reconsideration: HITL just modified the plan. Will retry modified step in next cycle.{bcolors.ENDC}"
-        )
-        if outcome.hitl_updated_beliefs:
-            print(
-                f"{bcolors.BELIEF}  Note: Beliefs were updated from HITL guidance and are now persisted.{bcolors.ENDC}"
-            )
-    elif agent.active_intention is not None:
+    if agent.active_intention is not None:
         if outcome.kind is ExecutionOutcomeKind.STEP_SUCCEEDED:
             print(
                 f"{bcolors.SYSTEM}  Skipping reconsideration: Plan Step succeeded and Plan progress should continue.{bcolors.ENDC}"

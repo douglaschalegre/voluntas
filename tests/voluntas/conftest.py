@@ -12,7 +12,6 @@ class StubBDIAgent:
         self.desires = []
         self.active_intention = None
         self.initial_intention_guidance = []
-        self.enable_human_in_the_loop = False
         self.verbose = False
         self.tool_configs = {}
         self._queued_run_outputs = deque()

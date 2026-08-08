@@ -27,33 +27,24 @@ Inside the core (not visible to the user):
 ---
 ## 4. Progress Updates in the CLI
 The CLI displays lightweight updates:
-- Current status (Working / Waiting / Needs Input).
+- Current status (Working / Waiting / Complete).
 - Latest message and intermediate results.
 - Optional logs for deeper inspection.
 
 ---
-## 5. Optional User Intervention (Guidance)
-If the agent encounters a difficulty (or the user just wants a change), the CLI prompts for guidance.
-
-User can type guidance like: "Skip docs/" or "Add a changelog section."
-
-The BDI core updates its internal plan and resumes.
-
----
-## 6. Completion and Output
+## 5. Completion and Output
 When the plan finishes:
 - The BDI core emits a completion event with final output (summary text, structured data, etc.).
 - The CLI prints the final report and can optionally save it to disk.
 
 ---
-## 7. (Optional) Session History
+## 6. (Optional) Session History
 Run logs can be stored for later review, making it easy to inspect past goals and outputs.
 
 ---
-## 8. Key Value for Users
+## 7. Key Value for Users
 - Natural language in -> actionable structured work out.
 - Real-time progress visibility builds trust.
-- Optional guidance gives a feeling of collaboration.
 - Final deliverable is clean and shareable.
 
 ---
@@ -64,7 +55,6 @@ graph TD
    CLI --> BDI[BDI Core<br/>Plan and Execute]
    BDI --> P[(Progress Events)]
    P --> CLI2[CLI Updates Output]
-   CLI2 -->|Optional Guidance| BDI
    BDI --> C[Completion Event]
    C --> CLI3[CLI Prints Final Report]
    CLI3 --> U2[User Reviews / Saves]
@@ -83,6 +73,5 @@ graph TD
 2. The runner registers the session and passes the goal to the BDI core.
 3. BDI core plans and executes internally.
 4. CLI streams progress updates.
-5. (If needed) User provides guidance -> loop back to BDI.
-6. BDI finishes -> final result returned.
-7. User reviews, saves, or starts another.
+5. BDI finishes -> final result returned.
+6. User reviews, saves, or starts another.

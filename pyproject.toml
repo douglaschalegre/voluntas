@@ -27,13 +27,16 @@ Homepage = "https://github.com/douglaschalegre/voluntas"
 Repository = "https://github.com/douglaschalegre/voluntas"
 Issues = "https://github.com/douglaschalegre/voluntas/issues"
 
+[project.scripts]
+lint = "scripts.commands:lint"
+tests = "scripts.commands:tests"
+
 [dependency-groups]
 dev = [
     "black>=23.0.0",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=7.0.0",
-    "python-dotenv>=1.0.0",
     "ruff>=0.1.0",
 ]
 
@@ -42,12 +45,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["voluntas", "runners"]
+packages = ["voluntas", "scripts"]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/voluntas",
-    "/runners",
+    "/scripts",
     "/LICENSE",
     "/README.md",
     "/pyproject.toml",

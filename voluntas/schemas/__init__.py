@@ -41,11 +41,6 @@ from voluntas.schemas.reconsider_schemas import (
     StepAssessmentResult,
 )
 
-# HITL schemas
-from voluntas.schemas.hitl_schemas import (
-    PlanManipulationDirective,
-)
-
 __all__ = [
     # Belief schemas
     "Belief",
@@ -70,6 +65,4 @@ __all__ = [
     "PlanReconsiderationAction",
     "ReconsiderResult",
     "StepAssessmentResult",
-    # HITL schemas
-    "PlanManipulationDirective",
 ]

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Tuple, cast
 
 from voluntas._utils import bcolors
 from voluntas.errors import is_validation_output_error
-from voluntas.logging import log_states
 from voluntas.schemas.belief_schemas import BatchBeliefResolutionResult
 
 if TYPE_CHECKING:
@@ -394,34 +393,7 @@ async def update_beliefs_from_step_extraction(
     return stats
 
 
-async def update_beliefs_from_hitl_guidance(
-    agent: "BDI", beliefs_to_update: Dict[str, Dict[str, Any]]
-) -> bool:
-    """Apply beliefs provided through human-in-the-loop guidance."""
-    prepared = (
-        {
-            "name": name,
-            "value": belief_data["value"],
-            "certainty": belief_data.get("certainty", 1.0),
-            "source": belief_data.get("source", "human_guidance"),
-        }
-        for name, belief_data in beliefs_to_update.items()
-    )
-    stats, applied = await _apply_belief_batch(agent, prepared)
-    beliefs_updated = any(result[3] in {"created", "updated"} for result in applied)
-
-    if beliefs_updated:
-        log_states(agent, ["beliefs"], message="Beliefs updated from HITL guidance.")
-    elif agent.verbose and beliefs_to_update:
-        print(
-            f"{bcolors.SYSTEM}  HITL beliefs unchanged ({stats['unchanged']} duplicate entries acknowledged).{bcolors.ENDC}"
-        )
-
-    return beliefs_updated
-
-
 __all__ = [
     "update_beliefs_from_desire_extraction",
-    "update_beliefs_from_hitl_guidance",
     "update_beliefs_from_step_extraction",
 ]
