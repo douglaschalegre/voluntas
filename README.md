@@ -82,8 +82,8 @@ Each cycle coordinates the following stages:
 5. Reconsider the remaining plan after failed or changed work.
 
 The framework supports MCP servers through the Pydantic AI integration passed
-to `BDI`, as well as structured logs and aggregate usage tracking through
-`BDIUsageTracker`.
+to `BDI`. `BDIUsageTracker` aggregates usage across runs for a final execution
+summary.
 
 ## Development
 

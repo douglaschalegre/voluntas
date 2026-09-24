@@ -5,7 +5,6 @@ beliefs, desires, intentions, planning, execution, and monitoring.
 """
 
 from collections.abc import Sequence
-import json
 from pathlib import Path
 from typing import Any, Generic, List, Optional, TypeVar, overload
 
@@ -35,7 +34,6 @@ from voluntas.schemas import (
 from voluntas.belief_updates import update_beliefs_from_desire_extraction
 from voluntas.errors import is_validation_output_error
 from voluntas.logging import (
-    build_structured_run_log_entry,
     configure_terminal_output_mirror,
     log_states,
 )
@@ -74,9 +72,7 @@ class BDI(Agent, Generic[T]):
         intentions: Optional[List[str]] = None,
         verbose: bool = False,
         log_file_path: Optional[str] = None,
-        structured_log_file_path: Optional[str] = None,
         usage_tracker: Optional[BDIUsageTracker] = None,
-        emit_run_events_to_stdout: bool = False,
         stream_model_requests: bool = False,
         output_retries: int = 3,  # Higher default for structured output retries
         **kwargs,
@@ -90,18 +86,12 @@ class BDI(Agent, Generic[T]):
         self._initial_intention_guidance_consumed = False
         self.verbose = verbose
         self.log_file_path = log_file_path
-        self.structured_log_file_path = structured_log_file_path
         self.usage_tracker = usage_tracker
-        self.emit_run_events_to_stdout = emit_run_events_to_stdout
         self.stream_model_requests = stream_model_requests
-        self._structured_log_entries: list[dict[str, Any]] = []
         self.cycle_count = 0
 
         if self.log_file_path:
             self._initialize_log_file()
-
-        if self.structured_log_file_path:
-            self._initialize_structured_log_file()
 
         self._initialize_string_desires(desires)
 
@@ -191,69 +181,6 @@ class BDI(Agent, Generic[T]):
             )
             self.log_file_path = None
 
-    def _initialize_structured_log_file(self) -> None:
-        """Initialize the structured JSON run log file."""
-        if not self.structured_log_file_path:
-            return
-
-        try:
-            Path(self.structured_log_file_path).parent.mkdir(
-                parents=True, exist_ok=True
-            )
-            self._structured_log_entries = []
-            with open(self.structured_log_file_path, "w", encoding="utf-8") as f:
-                json.dump(self._structured_log_entries, f, ensure_ascii=False, indent=2)
-
-            if self.verbose:
-                print(
-                    f"{bcolors.SYSTEM}Structured log file initialized at: {self.structured_log_file_path}{bcolors.ENDC}"
-                )
-        except Exception as e:
-            print(
-                f"{bcolors.FAIL}Failed to initialize structured log file at {self.structured_log_file_path}: {e}{bcolors.ENDC}"
-            )
-            self.structured_log_file_path = None
-
-    def _persist_structured_log_entries(self) -> None:
-        """Rewrite the structured run log JSON file."""
-        if not self.structured_log_file_path:
-            return
-
-        try:
-            with open(self.structured_log_file_path, "w", encoding="utf-8") as f:
-                json.dump(self._structured_log_entries, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(
-                f"{bcolors.WARNING}Failed to persist structured log at {self.structured_log_file_path}: {e}{bcolors.ENDC}"
-            )
-            self.structured_log_file_path = None
-
-    def _record_structured_run(
-        self,
-        user_prompt: str | Sequence[UserContent] | None,
-        result: AgentRunResult[Any],
-    ) -> None:
-        """Capture a single `run(...)` invocation as structured run metadata."""
-        model_name = self.usage_tracker.model_name if self.usage_tracker else None
-        entry = build_structured_run_log_entry(
-            user_prompt,
-            result,
-            model_name=model_name,
-        )
-        self._structured_log_entries.append(entry)
-        self._persist_structured_log_entries()
-        if self.emit_run_events_to_stdout:
-            self._emit_stdout_run_event(entry)
-
-    def _emit_stdout_run_event(self, entry: dict[str, Any]) -> None:
-        """Emit one JSON Lines event for SBench stdout capture."""
-        event = {
-            "type": "voluntas.agent.run.completed",
-            "run_index": len(self._structured_log_entries),
-            **entry,
-        }
-        print(json.dumps(event, ensure_ascii=True))
-
     def _usage_attributes(self) -> dict[str, Any]:
         desire_statuses: dict[str, int] = {}
         for desire in self.desires:
@@ -338,7 +265,7 @@ class BDI(Agent, Generic[T]):
         | None = None,
         event_stream_handler: EventStreamHandler[Any] | None = None,
     ) -> AgentRunResult[Any]:
-        """Run the underlying Pydantic AI agent and capture a structured log entry."""
+        """Run the underlying Pydantic AI agent and track aggregate usage."""
         if self.stream_model_requests:
             async with super().run_stream(
                 user_prompt=user_prompt,
@@ -383,13 +310,6 @@ class BDI(Agent, Generic[T]):
         except Exception as e:
             print(
                 f"{bcolors.WARNING}Failed to capture usage metadata: {e}{bcolors.ENDC}"
-            )
-
-        try:
-            self._record_structured_run(user_prompt, result)
-        except Exception as e:
-            print(
-                f"{bcolors.WARNING}Failed to capture structured run log entry: {e}{bcolors.ENDC}"
             )
 
         return result

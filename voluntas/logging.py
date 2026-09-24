@@ -3,30 +3,16 @@
 This module provides functions for:
 - mirroring terminal output to a log file
 - formatting beliefs, desires, and intentions for display or LLM prompts
-- transforming agent runs into structured JSON log entries
 """
 
-from collections.abc import Sequence
 from datetime import datetime
-from dataclasses import asdict, is_dataclass
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 import atexit
-import json
 import os
 import re
 import sys
 import threading
 
-from pydantic_ai.messages import (
-    ModelRequest,
-    ModelResponse,
-    ToolCallPart,
-    ToolReturnPart,
-    UserContent,
-    UserPromptPart,
-)
-
-from voluntas.usage import build_result_usage_metadata
 from voluntas._utils import bcolors
 
 if TYPE_CHECKING:
@@ -179,167 +165,6 @@ def disable_terminal_output_mirror() -> None:
 atexit.register(disable_terminal_output_mirror)
 
 
-def _to_jsonable(value: Any) -> Any:
-    """Convert arbitrary values into JSON-compatible structures."""
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-
-    if isinstance(value, (bytes, bytearray)):
-        return value.decode(errors="replace")
-
-    if isinstance(value, dict):
-        return {str(key): _to_jsonable(item) for key, item in value.items()}
-
-    if isinstance(value, (list, tuple, set, frozenset)):
-        return [_to_jsonable(item) for item in value]
-
-    if is_dataclass(value):
-        return _to_jsonable(asdict(value))
-
-    model_dump = getattr(value, "model_dump", None)
-    if callable(model_dump):
-        try:
-            return _to_jsonable(model_dump(mode="json"))
-        except TypeError:
-            return _to_jsonable(model_dump())
-
-    dict_method = getattr(value, "dict", None)
-    if callable(dict_method):
-        return _to_jsonable(dict_method())
-
-    if hasattr(value, "__dict__"):
-        public_attrs = {
-            key: _to_jsonable(item)
-            for key, item in vars(value).items()
-            if not key.startswith("_")
-        }
-        if public_attrs:
-            return public_attrs
-
-    return str(value)
-
-
-def _serialize_value_to_string(value: Any) -> str:
-    """Return a stable string representation for structured log fields."""
-    if isinstance(value, str):
-        return value
-    return json.dumps(_to_jsonable(value), ensure_ascii=False)
-
-
-def _extract_text_from_user_content(content: str | Sequence[UserContent]) -> list[str]:
-    if isinstance(content, str):
-        return [content]
-
-    return [item for item in content if isinstance(item, str)]
-
-
-def _extract_user_text_from_messages(messages: Sequence[Any]) -> str:
-    fragments: list[str] = []
-
-    for message in messages:
-        if not isinstance(message, ModelRequest):
-            continue
-
-        for part in message.parts:
-            if isinstance(part, UserPromptPart):
-                fragments.extend(_extract_text_from_user_content(part.content))
-
-    return "\n".join(fragment for fragment in fragments if fragment)
-
-
-def _normalize_tool_args(args: Any) -> dict[str, Any]:
-    """Ensure tool arguments always serialize as an object."""
-    if args is None:
-        return {}
-
-    if isinstance(args, dict):
-        return {str(key): _to_jsonable(value) for key, value in args.items()}
-
-    if isinstance(args, str):
-        try:
-            parsed_args = json.loads(args)
-        except json.JSONDecodeError:
-            return {"input": args}
-
-        if isinstance(parsed_args, dict):
-            return {str(key): _to_jsonable(value) for key, value in parsed_args.items()}
-
-        return {"input": _to_jsonable(parsed_args)}
-
-    return {"input": _to_jsonable(args)}
-
-
-def build_structured_run_log_entry(
-    user_prompt: str | Sequence[UserContent] | None,
-    result: Any,
-    *,
-    model_name: str | None = None,
-) -> dict[str, Any]:
-    """Build a structured JSON log entry for a single agent run."""
-    messages = result.new_messages() if hasattr(result, "new_messages") else []
-
-    if isinstance(user_prompt, str):
-        user_text = user_prompt
-    else:
-        user_text = _extract_user_text_from_messages(messages)
-
-    assistant_text: str | None = None
-    try:
-        response = result.response
-    except Exception:
-        response = None
-
-    if isinstance(response, ModelResponse):
-        assistant_text = response.text
-
-    if assistant_text is None:
-        assistant_text = _serialize_value_to_string(getattr(result, "output", ""))
-
-    output_tool_name = getattr(result, "_output_tool_name", None)
-    tool_returns: dict[str, ToolReturnPart] = {}
-    for message in messages:
-        if not isinstance(message, ModelRequest):
-            continue
-
-        for part in message.parts:
-            if not isinstance(part, ToolReturnPart):
-                continue
-            if output_tool_name and part.tool_name == output_tool_name:
-                continue
-            tool_returns[part.tool_call_id] = part
-
-    tool_calls: list[dict[str, Any]] = []
-    for message in messages:
-        if not isinstance(message, ModelResponse):
-            continue
-
-        for part in message.parts:
-            if not isinstance(part, ToolCallPart):
-                continue
-            if output_tool_name and part.tool_name == output_tool_name:
-                continue
-
-            tool_return = tool_returns.get(part.tool_call_id)
-            tool_calls.append(
-                {
-                    "func_name": part.tool_name,
-                    "args": _normalize_tool_args(part.args),
-                    "result": _serialize_value_to_string(
-                        tool_return.content if tool_return is not None else ""
-                    ),
-                }
-            )
-
-    entry = {
-        "user": user_text,
-        "assistant": assistant_text,
-        "tool_calls": tool_calls,
-    }
-    if usage_metadata := build_result_usage_metadata(result, model_name=model_name):
-        entry.update(usage_metadata)
-    return entry
-
-
 def format_beliefs_for_context(agent: "BDI") -> str:
     """Format current beliefs for inclusion in LLM prompts.
 
@@ -448,7 +273,6 @@ def log_states(
 
 
 __all__ = [
-    "build_structured_run_log_entry",
     "configure_terminal_output_mirror",
     "disable_terminal_output_mirror",
     "format_beliefs_for_context",

@@ -57,18 +57,6 @@ def _extract_result_usage(result: Any) -> Any | None:
     return usage
 
 
-def _extract_result_model_name(result: Any, fallback: str | None = None) -> str | None:
-    try:
-        response = result.response
-    except Exception:
-        response = None
-
-    model_name = getattr(response, "model_name", None)
-    if isinstance(model_name, str) and model_name:
-        return model_name
-    return fallback
-
-
 def _price_to_float(price: Any) -> float | None:
     if (numeric := _as_numeric(price)) is not None:
         return numeric
@@ -179,35 +167,6 @@ def summarize_usage(usage: Any) -> dict[str, Any]:
         "total_tokens": input_tokens + output_tokens,
         "details": dict(sorted(_usage_details(usage).items())),
     }
-
-
-def summarize_usage_cost(usage: Any, model_name: str | None) -> dict[str, Any]:
-    """Return best-effort cost metadata for one usage object."""
-    cost_usd = _estimate_cost_usd(usage, model_name)
-    return {
-        "usd": cost_usd,
-        "estimated": cost_usd is not None,
-    }
-
-
-def build_result_usage_metadata(
-    result: Any,
-    *,
-    model_name: str | None = None,
-) -> dict[str, Any] | None:
-    """Build per-call usage metadata from an AgentRunResult-like object."""
-    usage = _extract_result_usage(result)
-    if usage is None:
-        return None
-
-    resolved_model_name = _extract_result_model_name(result, model_name)
-    metadata: dict[str, Any] = {
-        "usage": summarize_usage(usage),
-        "cost": summarize_usage_cost(usage, resolved_model_name),
-    }
-    if resolved_model_name is not None:
-        metadata["model"] = resolved_model_name
-    return metadata
 
 
 @dataclass
@@ -343,7 +302,5 @@ class BDIUsageTracker:
 
 __all__ = [
     "BDIUsageTracker",
-    "build_result_usage_metadata",
     "summarize_usage",
-    "summarize_usage_cost",
 ]
