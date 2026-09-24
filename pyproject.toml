@@ -1,6 +1,6 @@
 [project]
 name = "voluntas"
-version = "0.1.2"
+version = "0.1.3"
 description = "A BDI (Belief-Desire-Intention) agent framework built on Pydantic AI"
 readme = "README.md"
 license = { file = "LICENSE" }
