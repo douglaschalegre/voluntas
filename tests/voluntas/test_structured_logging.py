@@ -16,7 +16,13 @@ from pydantic_ai.messages import (
 import voluntas.agent as agent_module
 from voluntas import usage as usage_module
 from voluntas.agent import BDI
+from voluntas._utils import bcolors
 from voluntas.logging import build_structured_run_log_entry
+
+
+def test_colors_are_omitted_from_captured_stdout(capsys) -> None:
+    print(f"{bcolors.SYSTEM}BDI cycle{bcolors.ENDC}")
+    assert capsys.readouterr().out == "BDI cycle\n"
 
 
 def _build_result(

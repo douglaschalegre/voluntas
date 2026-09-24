@@ -1,4 +1,16 @@
-class bcolors:
+import sys
+
+
+class _ColorMeta(type):
+    def __getattribute__(cls, name):
+        value = super().__getattribute__(name)
+        if isinstance(value, str) and value.startswith("\033["):
+            if not sys.stdout.isatty():
+                return ""
+        return value
+
+
+class bcolors(metaclass=_ColorMeta):
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
     OKCYAN = "\033[96m"
